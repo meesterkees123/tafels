@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Astroid vs Brinnox — Cyber Battle Math</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ===== FULL-SCREEN CONTAINER ===== */
+#game {
+  position: relative;
+  width: 100%; height: 100%;
+  background: url('Background.png') center/cover no-repeat;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Safe area for notched phones in landscape */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Dark overlay so UI pops */
+#game::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 0;
+}
+#game > * { position: relative; z-index: 1; }
+
+/* ===== TOP HUD BAR ===== */
+#hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2vh 2vw 0.6vh;
+  gap: 1.5vw;
+  flex-shrink: 0;
+}
+
+.player-hud {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.player-hud.right { flex-direction: row-reverse; }
+
+.player-name {
+  font-size: clamp(14px, 2.4vh, 24px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 10px currentColor, 0 2px 4px rgba(0,0,0,0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.player-hud.left .player-name { color: #a855f7; }
+.player-hud.right .player-name { color: #f97316; }
+
+.hp-bar-wrap {
+  flex: 1;
+  height: clamp(18px, 3vh, 32px);
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+  border: 2px solid rgba(255,255,255,0.15);
+  overflow: hidden;
+  position: relative;
+}
+.hp-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+.player-hud.left .hp-bar {
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  float: right;
+}
+.player-hud.right .hp-bar {
+  background: linear-gradient(90deg, #f97316, #fb923c);
+  float: left;
+}
+.hp-bar::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.3), transparent);
+  border-radius: 4px 4px 0 0;
+}
+
+.hp-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(10px, 1.8vh, 16px);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+
+.heart-icon {
+  font-size: clamp(16px, 2.8vh, 28px);
+  filter: drop-shadow(0 0 4px rgba(255,0,80,0.6));
+}
+
+.score-badge {
+  font-size: clamp(12px, 2vh, 20px);
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0,0,0,0.6);
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 0.3vh 1vw;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  white-space: nowrap;
+}
+
+/* Center VS / round badge */
+#round-badge {
+  font-size: clamp(11px, 1.8vh, 18px);
+  font-weight: 800;
+  color: #facc15;
+  text-shadow: 0 0 8px rgba(250,204,21,0.6), 0 2px 4px rgba(0,0,0,0.9);
+  text-align: center;
+  white-space: nowrap;
+  min-width: 8vw;
+}
+
+/* ===== MAIN ARENA ===== */
+#arena {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Divider line */
+#arena::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0.15) 80%, transparent);
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.player-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 1.5vw 1.5vh;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ===== CHARACTER SPRITES ===== */
+.character {
+  width: clamp(120px, 22vw, 280px);
+  height: auto;
+  max-height: 45vh;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 20px rgba(0,0,0,0.6));
+  transition: transform 0.3s ease, filter 0.3s ease;
+  flex-shrink: 0;
+}
+.player-side.left .character { transform: scaleX(1); }
+.player-side.right .character { transform: scaleX(1); }
+
+/* ===== ANSWER BUTTONS ===== */
+.answers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(6px, 1.2vh, 14px);
+  width: 90%;
+  max-width: 380px;
+  padding-top: 1vh;
+  flex-shrink: 0;
+}
+
+.answer-btn {
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  font-size: clamp(20px, 4vh, 42px);
+  font-weight: 900;
+  color: #fff;
+  padding: clamp(10px, 2vh, 24px) 0;
+  border-radius: clamp(10px, 1.8vh, 18px);
+  cursor: pointer;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  transition: transform 0.1s ease, filter 0.1s ease;
+  position: relative;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.answer-btn:active { transform: scale(0.93); }
+.answer-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Gloss effect */
+.answer-btn::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.25), transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Player 1 purple buttons */
+.left .answer-btn {
+  background: linear-gradient(180deg, #8b5cf6, #6d28d9);
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.left .answer-btn:active:not(:disabled) {
+  background: linear-gradient(180deg, #7c3aed, #5b21b6);
+}
+
+/* Player 2 orange buttons */
+.right .answer-btn {
+  background: linear-gradient(180deg, #f97316, #ea580c);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.right .answer-btn:active:not(:disabled) {
+  background: linear-gradient(180deg, #ea580c, #c2410c);
+}
+
+/* ===== CENTER QUESTION ===== */
+#question-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  text-align: center;
+  pointer-events: none;
+}
+
+#question-box {
+  background: radial-gradient(ellipse at center, rgba(15, 5, 30, 0.92), rgba(10, 2, 20, 0.88));
+  border: 3px solid rgba(168, 85, 247, 0.6);
+  border-radius: clamp(12px, 2vh, 24px);
+  padding: clamp(10px, 2vh, 28px) clamp(20px, 4vw, 60px);
+  box-shadow:
+    0 0 30px rgba(168, 85, 247, 0.3),
+    0 0 60px rgba(168, 85, 247, 0.1),
+    inset 0 0 30px rgba(168, 85, 247, 0.05);
+}
+
+#question-text {
+  font-size: clamp(28px, 6vh, 64px);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.4);
+  white-space: nowrap;
+}
+
+/* ===== ROUND RESULT FLASH ===== */
+#round-result {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 20;
+  font-size: clamp(28px, 6vh, 60px);
+  font-weight: 900;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px currentColor, 0 4px 8px rgba(0,0,0,0.8);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ===== GAME OVER OVERLAY ===== */
+#game-over {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.85);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vh;
+}
+#game-over.active { display: flex; }
+
+#game-over h1 {
+  font-size: clamp(32px, 7vh, 72px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 30px currentColor, 0 4px 8px rgba(0,0,0,0.8);
+}
+
+#game-over .subtitle {
+  font-size: clamp(16px, 3vh, 32px);
+  color: #e2e8f0;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+#restart-btn {
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  font-size: clamp(18px, 3.2vh, 30px);
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, #8b5cf6, #6d28d9);
+  padding: clamp(12px, 2vh, 22px) clamp(32px, 6vw, 80px);
+  border-radius: clamp(10px, 1.8vh, 18px);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 20px rgba(109, 40, 217, 0.5);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease;
+}
+#restart-btn:active { transform: scale(0.95); }
+#restart-btn::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.2), transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* ===== START SCREEN ===== */
+#start-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  align-items: center;
+  justify-content: center;
+  gap: 2.5vh;
+}
+#start-screen.hidden { display: none; }
+
+#start-screen h1 {
+  font-size: clamp(28px, 6vh, 64px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: linear-gradient(90deg, #a855f7, #f97316);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
+}
+
+#start-screen .vs-text {
+  font-size: clamp(40px, 8vh, 80px);
+  font-weight: 900;
+  color: #facc15;
+  text-shadow: 0 0 30px rgba(250,204,21,0.6), 0 4px 8px rgba(0,0,0,0.8);
+}
+
+.start-characters {
+  display: flex;
+  align-items: center;
+  gap: 4vw;
+}
+
+.start-characters img {
+  width: clamp(100px, 18vw, 220px);
+  filter: drop-shadow(0 4px 20px rgba(0,0,0,0.6));
+}
+.start-characters img:last-child { transform: scaleX(1); }
+
+.start-name {
+  font-size: clamp(18px, 3vh, 32px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 10px currentColor, 0 2px 4px rgba(0,0,0,0.8);
+  text-align: center;
+}
+.start-name.p1 { color: #a855f7; }
+.start-name.p2 { color: #f97316; }
+
+#start-btn {
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  font-size: clamp(20px, 3.5vh, 34px);
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  padding: clamp(14px, 2.5vh, 26px) clamp(40px, 8vw, 100px);
+  border-radius: clamp(12px, 2vh, 22px);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.5);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease;
+  position: relative;
+  overflow: hidden;
+}
+#start-btn:active { transform: scale(0.95); }
+#start-btn::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.25), transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* ===== COUNTDOWN OVERLAY ===== */
+#countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#countdown.active { display: flex; }
+
+#countdown-text {
+  font-size: clamp(60px, 14vh, 140px);
+  font-weight: 900;
+  color: #facc15;
+  text-shadow: 0 0 40px rgba(250,204,21,0.6), 0 4px 12px rgba(0,0,0,0.8);
+  animation: countPulse 0.6s ease-out;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes countPulse {
+  0% { transform: scale(1.6); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes cameraShake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-6px, -4px); }
+  20% { transform: translate(5px, 6px); }
+  30% { transform: translate(-7px, 2px); }
+  40% { transform: translate(4px, -5px); }
+  50% { transform: translate(-3px, 5px); }
+  60% { transform: translate(6px, -2px); }
+  70% { transform: translate(-4px, 4px); }
+  80% { transform: translate(3px, -6px); }
+  90% { transform: translate(-5px, 3px); }
+}
+
+.shake {
+  animation: cameraShake 0.4s ease-out;
+}
+
+@keyframes victoryJump {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(-20px); }
+  50% { transform: translateY(-25px); }
+  70% { transform: translateY(-20px); }
+  100% { transform: translateY(0); }
+}
+.right .character.victoryJump {
+  animation: victoryJump 0.5s ease-out;
+}
+.left .character.victoryJump {
+  animation: victoryJump 0.5s ease-out;
+}
+
+@keyframes resultFlash {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  40% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+@keyframes stunPulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 4px 20px rgba(0,0,0,0.6)); }
+  50% { filter: brightness(0.4) drop-shadow(0 4px 20px rgba(255,0,0,0.6)); }
+}
+.character.stunned {
+  animation: stunPulse 0.3s ease-in-out 3;
+}
+
+@keyframes gameOverFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+#game-over.active {
+  animation: gameOverFadeIn 0.6s ease-out;
+}
+
+/* Damage flash on HP bar */
+@keyframes hpFlash {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: inset 0 0 20px rgba(255, 50, 50, 0.8); }
+}
+.hp-bar-wrap.flash {
+  animation: hpFlash 0.3s ease-out 2;
+}
+
+/* Stun indicator */
+.stun-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 0, 0, 0.12);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  pointer-events: none;
+  border-radius: 0;
+}
+.stun-overlay.active { display: flex; }
+.stun-overlay span {
+  font-size: clamp(24px, 4.5vh, 48px);
+  font-weight: 900;
+  color: #ef4444;
+  text-shadow: 0 0 15px rgba(239,68,68,0.6), 0 2px 4px rgba(0,0,0,0.8);
+  text-transform: uppercase;
+  animation: stunTextPulse 0.5s ease-in-out infinite;
+}
+@keyframes stunTextPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Correct answer flash on button */
+@keyframes correctFlash {
+  0% { background: #22c55e; box-shadow: 0 0 30px rgba(34,197,94,0.8); }
+  100% { background: #22c55e; box-shadow: 0 0 5px rgba(34,197,94,0.3); }
+}
+.answer-btn.correct {
+  background: #22c55e !important;
+  animation: correctFlash 0.4s ease-out;
+}
+
+@keyframes wrongFlash {
+  0% { background: #ef4444; box-shadow: 0 0 30px rgba(239,68,68,0.8); }
+  100% { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.3); }
+}
+.answer-btn.wrong {
+  background: #ef4444 !important;
+  animation: wrongFlash 0.4s ease-out;
+}
+
+/* ===== GAME OVER CHARACTER DISPLAY ===== */
+.game-over-characters {
+  display: flex;
+  align-items: flex-end;
+  gap: 4vw;
+}
+.game-over-characters img {
+  width: clamp(100px, 18vw, 220px);
+  filter: drop-shadow(0 4px 20px rgba(0,0,0,0.6));
+}
+.game-over-characters img:last-child { transform: scaleX(1); }
+.game-over-characters img.loser { filter: grayscale(0.5) brightness(0.6) drop-shadow(0 4px 20px rgba(0,0,0,0.6)); }
+
+/* =============================================================
+   MOBILE LANDSCAPE — max-height ≤ 500px
+   Uses vertical column layout (same as iPad) with smaller sizes.
+   Characters are positioned absolutely to save vertical space.
+   ============================================================= */
+@media (max-height: 500px) and (orientation: landscape) {
+
+  /* HUD — compact */
+  #hud {
+    padding: 2px 1.2vw;
+    gap: 0.8vw;
+  }
+  .player-name { font-size: 10px; letter-spacing: 0.03em; }
+  .hp-bar-wrap { height: 12px; }
+  .hp-text { font-size: 8px; }
+  .heart-icon { font-size: 12px; }
+  .score-badge { font-size: 9px; padding: 1px 5px; border-radius: 5px; }
+  #round-badge { font-size: 9px; min-width: auto; }
+
+  /* Arena — no overflow clip */
+  #arena { overflow: visible; }
+
+  /* Player sides — keep column, compact padding */
+  .player-side {
+    padding: 0 2vw 4px;
+    justify-content: flex-end;
+  }
+
+  /* Characters — absolutely positioned behind buttons */
+  .character {
+    position: absolute;
+    bottom: 10%;
+    width: 18vw;
+    max-width: 130px;
+    max-height: 60vh;
+    opacity: 0.4;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .player-side.left .character { left: 2vw; }
+  .player-side.right .character { right: 2vw; }
+
+  /* Answer buttons — full width, prominent */
+  .answers-grid {
+    position: relative;
+    z-index: 2;
+    gap: 4px;
+    max-width: 85%;
+    width: 85%;
+    padding-top: 0;
+  }
+  .answer-btn {
+    font-size: clamp(16px, 4vh, 28px);
+    padding: clamp(8px, 2.2vh, 18px) 0;
+    border-radius: 8px;
+  }
+
+  /* Center question — compact, positioned higher */
+  #question-container { top: 35%; }
+  #question-box {
+    padding: clamp(4px, 0.8vh, 10px) clamp(10px, 2vw, 26px);
+    border-width: 2px;
+    border-radius: 10px;
+  }
+  #question-text {
+    font-size: clamp(18px, 5vh, 36px);
+  }
+
+  /* Round result flash */
+  #round-result { font-size: clamp(18px, 4vh, 34px); }
+
+  /* Start screen */
+  #start-screen { gap: 1.2vh; }
+  #start-screen h1 { font-size: clamp(14px, 3.5vh, 28px); }
+  .start-characters img { width: clamp(50px, 10vw, 110px); }
+  .start-characters { gap: 3vw; }
+  .vs-text { font-size: clamp(22px, 5vh, 40px); }
+  .start-name { font-size: clamp(11px, 1.8vh, 16px); }
+  #start-btn {
+    font-size: clamp(14px, 2.8vh, 22px);
+    padding: clamp(8px, 1.5vh, 14px) clamp(24px, 5vw, 50px);
+    border-radius: 10px;
+  }
+
+  /* Countdown */
+  #countdown-text { font-size: clamp(36px, 10vh, 80px); }
+
+  /* Game over */
+  #game-over { gap: 1.5vh; }
+  #game-over h1 { font-size: clamp(18px, 4.5vh, 36px); }
+  #game-over .subtitle { font-size: clamp(11px, 2vh, 16px); }
+  .game-over-characters img { width: clamp(50px, 10vw, 110px); }
+  #restart-btn {
+    font-size: clamp(13px, 2.5vh, 18px);
+    padding: clamp(7px, 1.3vh, 12px) clamp(18px, 4vw, 44px);
+    border-radius: 10px;
+  }
+
+  /* Stun overlay text */
+  .stun-overlay span { font-size: clamp(14px, 2.8vh, 24px); }
+}
+</style>
+</head>
+<body>
+
+<div id="game">
+
+  <!-- ===== START SCREEN ===== -->
+  <div id="start-screen">
+    <h1>Wie kent zijn tafels het best?</h1>
+    <div class="start-characters">
+      <div>
+        <img id="start-p1-img" src="" alt="Astroid">
+        <div class="start-name p1" id="start-p1-name"></div>
+      </div>
+      <div class="vs-text">VS</div>
+      <div>
+        <img id="start-p2-img" src="" alt="Brinnox">
+        <div class="start-name p2" id="start-p2-name"></div>
+      </div>
+    </div>
+    <button id="start-btn">Start</button>
+  </div>
+
+  <!-- ===== COUNTDOWN ===== -->
+  <div id="countdown">
+    <div id="countdown-text"></div>
+  </div>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud">
+    <!-- Player 1 HUD -->
+    <div class="player-hud left">
+      <span class="heart-icon">❤️</span>
+      <span class="player-name" id="p1-name"></span>
+      <div class="hp-bar-wrap" id="p1-hp-wrap">
+        <div class="hp-bar" id="p1-hp-bar" style="width:100%"></div>
+        <div class="hp-text" id="p1-hp-text">100 HP</div>
+      </div>
+      <span class="score-badge" id="p1-score">0 / 0</span>
+    </div>
+
+    <!-- Center round badge -->
+    <div id="round-badge">RONDE 1</div>
+
+    <!-- Player 2 HUD -->
+    <div class="player-hud right">
+      <span class="heart-icon">❤️</span>
+      <span class="player-name" id="p2-name"></span>
+      <div class="hp-bar-wrap" id="p2-hp-wrap">
+        <div class="hp-bar" id="p2-hp-bar" style="width:100%"></div>
+        <div class="hp-text" id="p2-hp-text">100 HP</div>
+      </div>
+      <span class="score-badge" id="p2-score">0 / 0</span>
+    </div>
+  </div>
+
+  <!-- ===== ARENA ===== -->
+  <div id="arena">
+
+    <!-- Player 1 side -->
+    <div class="player-side left" id="p1-side">
+      <div class="stun-overlay" id="p1-stun"><span>Stunned!</span></div>
+      <img class="character" id="p1-character" src="" alt="Astroid">
+      <div class="answers-grid" id="p1-answers"></div>
+    </div>
+
+    <!-- Center question -->
+    <div id="question-container">
+      <div id="question-box">
+        <div id="question-text">—</div>
+      </div>
+    </div>
+
+    <!-- Round result flash -->
+    <div id="round-result"></div>
+
+    <!-- Player 2 side -->
+    <div class="player-side right" id="p2-side">
+      <div class="stun-overlay" id="p2-stun"><span>Stunned!</span></div>
+      <img class="character" id="p2-character" src="" alt="Brinnox">
+      <div class="answers-grid" id="p2-answers"></div>
+    </div>
+
+  </div>
+
+  <!-- ===== GAME OVER ===== -->
+  <div id="game-over">
+    <h1 id="game-over-title"></h1>
+    <div class="game-over-characters">
+      <img id="go-p1-img" src="" alt="Player 1">
+      <img id="go-p2-img" src="" alt="Player 2">
+    </div>
+    <div class="subtitle" id="game-over-subtitle"></div>
+    <button id="restart-btn">Opnieuw Spelen</button>
+  </div>
+
+</div>
+
+<script>
+/* =============================================================
+   CONFIGURATION — Change these to swap out assets / settings
+   ============================================================= */
+const CONFIG = {
+  // Player names
+  player1Name: 'Astroid',
+  player2Name: 'Brinnox',
+
+  // Character sprite filenames
+  player1Idle: 'Astroid_idle.png',
+  player1Win:  'Astroid_win.png',
+  player1Lose: 'Astroid_lose.png',
+
+  player2Idle: 'Brinnox_idle.png',
+  player2Win:  'Brinnox_win.png',
+  player2Lose: 'Brinnox_lose.png',
+
+  // Background
+  background: 'Background.png',
+
+  // Gameplay
+  startingHP: 100,
+  damagePerRound: 10,
+  stunDurationMs: 2000,
+  multiplicationMin: 2,
+  multiplicationMax: 9,
+  totalAnswerOptions: 4,
+  roundDelayMs: 1200,
+};
+
+/* =============================================================
+   GAME STATE
+   ============================================================= */
+let state = {
+  p1HP: CONFIG.startingHP,
+  p2HP: CONFIG.startingHP,
+  p1Score: 0,
+  p2Score: 0,
+  round: 0,
+  totalRounds: 0,
+  correctAnswer: 0,
+  roundActive: false,
+  p1Stunned: false,
+  p2Stunned: false,
+  gameOver: false,
+  roundId: 0,          // increments each round; stun timers check this to avoid cross-round interference
+};
+
+/* =============================================================
+   DOM REFERENCES
+   ============================================================= */
+const $ = (id) => document.getElementById(id);
+
+const dom = {
+  game: $('game'),
+  startScreen: $('start-screen'),
+  startBtn: $('start-btn'),
+  startP1Img: $('start-p1-img'),
+  startP2Img: $('start-p2-img'),
+  startP1Name: $('start-p1-name'),
+  startP2Name: $('start-p2-name'),
+  countdown: $('countdown'),
+  countdownText: $('countdown-text'),
+  p1Name: $('p1-name'),
+  p2Name: $('p2-name'),
+  p1HPBar: $('p1-hp-bar'),
+  p2HPBar: $('p2-hp-bar'),
+  p1HPWrap: $('p1-hp-wrap'),
+  p2HPWrap: $('p2-hp-wrap'),
+  p1HPText: $('p1-hp-text'),
+  p2HPText: $('p2-hp-text'),
+  p1Score: $('p1-score'),
+  p2Score: $('p2-score'),
+  roundBadge: $('round-badge'),
+  questionText: $('question-text'),
+  p1Answers: $('p1-answers'),
+  p2Answers: $('p2-answers'),
+  p1Character: $('p1-character'),
+  p2Character: $('p2-character'),
+  p1Side: $('p1-side'),
+  p2Side: $('p2-side'),
+  p1Stun: $('p1-stun'),
+  p2Stun: $('p2-stun'),
+  roundResult: $('round-result'),
+  gameOver: $('game-over'),
+  gameOverTitle: $('game-over-title'),
+  gameOverSubtitle: $('game-over-subtitle'),
+  goP1Img: $('go-p1-img'),
+  goP2Img: $('go-p2-img'),
+  restartBtn: $('restart-btn'),
+};
+
+/* =============================================================
+   INIT
+   ============================================================= */
+function init() {
+  // Set background
+  dom.game.style.backgroundImage = `url('${CONFIG.background}')`;
+
+  // Set names
+  dom.p1Name.textContent = CONFIG.player1Name;
+  dom.p2Name.textContent = CONFIG.player2Name;
+  dom.startP1Name.textContent = CONFIG.player1Name;
+  dom.startP2Name.textContent = CONFIG.player2Name;
+
+  // Set start screen images
+  dom.startP1Img.src = CONFIG.player1Idle;
+  dom.startP2Img.src = CONFIG.player2Idle;
+
+  // Set character sprites
+  dom.p1Character.src = CONFIG.player1Idle;
+  dom.p2Character.src = CONFIG.player2Idle;
+
+  // Events
+  dom.startBtn.addEventListener('click', startGame);
+  dom.restartBtn.addEventListener('click', restartGame);
+}
+
+/* =============================================================
+   GAME FLOW
+   ============================================================= */
+function startGame() {
+  dom.startScreen.classList.add('hidden');
+  runCountdown(() => {
+    resetState();
+    nextRound();
+  });
+}
+
+function restartGame() {
+  dom.gameOver.classList.remove('active');
+  dom.goP1Img.classList.remove('loser');
+  dom.goP2Img.classList.remove('loser');
+  dom.p1Character.src = CONFIG.player1Idle;
+  dom.p2Character.src = CONFIG.player2Idle;
+  runCountdown(() => {
+    resetState();
+    nextRound();
+  });
+}
+
+function resetState() {
+  state.p1HP = CONFIG.startingHP;
+  state.p2HP = CONFIG.startingHP;
+  state.p1Score = 0;
+  state.p2Score = 0;
+  state.round = 0;
+  state.totalRounds = 0;
+  state.gameOver = false;
+  state.p1Stunned = false;
+  state.p2Stunned = false;
+  updateHP();
+  updateScores();
+}
+
+function runCountdown(callback) {
+  dom.countdown.classList.add('active');
+  let count = 3;
+  dom.countdownText.textContent = count;
+  dom.countdownText.style.animation = 'none';
+  void dom.countdownText.offsetWidth;
+  dom.countdownText.style.animation = 'countPulse 0.6s ease-out';
+
+  const interval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      dom.countdownText.textContent = count;
+      dom.countdownText.style.animation = 'none';
+      void dom.countdownText.offsetWidth;
+      dom.countdownText.style.animation = 'countPulse 0.6s ease-out';
+    } else if (count === 0) {
+      dom.countdownText.textContent = 'REKENEN!';
+      dom.countdownText.style.animation = 'none';
+      void dom.countdownText.offsetWidth;
+      dom.countdownText.style.animation = 'countPulse 0.6s ease-out';
+    } else {
+      clearInterval(interval);
+      dom.countdown.classList.remove('active');
+      callback();
+    }
+  }, 800);
+}
+
+/* =============================================================
+   ROUND LOGIC
+   ============================================================= */
+function nextRound() {
+  if (state.gameOver) return;
+
+  state.round++;
+  state.totalRounds++;
+  state.roundId++;
+  state.roundActive = true;
+  state.p1Stunned = false;
+  state.p2Stunned = false;
+  dom.p1Stun.classList.remove('active');
+  dom.p2Stun.classList.remove('active');
+  dom.p1Character.classList.remove('stunned');
+  dom.p2Character.classList.remove('stunned');
+
+  dom.roundBadge.textContent = `RONDE ${state.round}`;
+
+  // Generate multiplication problem
+  const a = randInt(CONFIG.multiplicationMin, CONFIG.multiplicationMax);
+  const b = randInt(CONFIG.multiplicationMin, CONFIG.multiplicationMax);
+  state.correctAnswer = a * b;
+
+  dom.questionText.textContent = `${a} × ${b} =`;
+
+  // Generate answer options
+  const options = generateOptions(state.correctAnswer, a, b);
+
+  // Render buttons for both players
+  renderAnswers(dom.p1Answers, options, 1);
+  renderAnswers(dom.p2Answers, options, 2);
+}
+
+function generateOptions(correct, a, b) {
+  const opts = new Set();
+  opts.add(correct);
+
+  // Nearby wrong answers that look plausible
+  const nearby = [
+    correct + randInt(1, 3),
+    correct - randInt(1, 3),
+    a * (b + 1),
+    a * (b - 1),
+    (a + 1) * b,
+    (a - 1) * b,
+    correct + randInt(4, 9),
+    correct - randInt(4, 9),
+  ].filter(n => n > 0 && n !== correct);
+
+  // Shuffle and pick
+  shuffleArray(nearby);
+  for (const n of nearby) {
+    if (opts.size >= CONFIG.totalAnswerOptions) break;
+    opts.add(n);
+  }
+
+  // Fill remaining if needed
+  while (opts.size < CONFIG.totalAnswerOptions) {
+    const filler = correct + randInt(-12, 12);
+    if (filler > 0 && filler !== correct) opts.add(filler);
+  }
+
+  const arr = Array.from(opts);
+  shuffleArray(arr);
+  return arr;
+}
+
+function renderAnswers(container, options, player) {
+  container.innerHTML = '';
+  options.forEach(value => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = value;
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();        // prevent ghost click / double fire
+      handleAnswer(player, value, btn);
+    });
+    container.appendChild(btn);
+  });
+}
+
+function handleAnswer(player, value, btn) {
+  if (!state.roundActive) return;
+  if (player === 1 && state.p1Stunned) return;
+  if (player === 2 && state.p2Stunned) return;
+
+  if (value === state.correctAnswer) {
+    // Correct! This player wins the round
+    btn.classList.add('correct');
+    // Also highlight correct answer on other side
+    highlightCorrectOnBothSides(value);
+    winRound(player);
+  } else {
+    // Wrong — stun this player
+    btn.classList.add('wrong');
+    stunPlayer(player);
+  }
+}
+
+function highlightCorrectOnBothSides(value) {
+  [dom.p1Answers, dom.p2Answers].forEach(container => {
+    Array.from(container.children).forEach(btn => {
+      if (parseInt(btn.textContent) === value) {
+        btn.classList.add('correct');
+      }
+    });
+  });
+}
+
+function winRound(winner) {
+  state.roundActive = false;
+  const loser = winner === 1 ? 2 : 1;
+
+  // Update scores
+  if (winner === 1) state.p1Score++;
+  else state.p2Score++;
+  updateScores();
+
+  // Disable all buttons
+  disableAllButtons();
+
+  // Damage loser
+  if (loser === 1) {
+    state.p1HP = Math.max(0, state.p1HP - CONFIG.damagePerRound);
+    dom.p1HPWrap.classList.add('flash');
+    dom.game.classList.add('shake');
+  } else {
+    state.p2HP = Math.max(0, state.p2HP - CONFIG.damagePerRound);
+    dom.p2HPWrap.classList.add('flash');
+    dom.game.classList.add('shake');
+  }
+  updateHP();
+
+  // Victory jump for winner
+  const winnerChar = winner === 1 ? dom.p1Character : dom.p2Character;
+  winnerChar.classList.add('victoryJump');
+
+  // Show round result
+  showRoundResult(winner);
+
+  // Clean up animations
+  setTimeout(() => {
+    dom.game.classList.remove('shake');
+    dom.p1HPWrap.classList.remove('flash');
+    dom.p2HPWrap.classList.remove('flash');
+    winnerChar.classList.remove('victoryJump');
+  }, 600);
+
+  // Check game over or next round
+  setTimeout(() => {
+    if (state.p1HP <= 0 || state.p2HP <= 0) {
+      endGame();
+    } else {
+      nextRound();
+    }
+  }, CONFIG.roundDelayMs);
+}
+
+function stunPlayer(player) {
+  const rid = state.roundId;      // capture current round
+  if (player === 1) {
+    state.p1Stunned = true;
+    dom.p1Stun.classList.add('active');
+    dom.p1Character.classList.add('stunned');
+    disableButtons(dom.p1Answers);
+    setTimeout(() => {
+      if (state.roundId !== rid) return;   // round changed, ignore
+      state.p1Stunned = false;
+      dom.p1Stun.classList.remove('active');
+      dom.p1Character.classList.remove('stunned');
+      if (state.roundActive) enableButtons(dom.p1Answers);
+    }, CONFIG.stunDurationMs);
+  } else {
+    state.p2Stunned = true;
+    dom.p2Stun.classList.add('active');
+    dom.p2Character.classList.add('stunned');
+    disableButtons(dom.p2Answers);
+    setTimeout(() => {
+      if (state.roundId !== rid) return;   // round changed, ignore
+      state.p2Stunned = false;
+      dom.p2Stun.classList.remove('active');
+      dom.p2Character.classList.remove('stunned');
+      if (state.roundActive) enableButtons(dom.p2Answers);
+    }, CONFIG.stunDurationMs);
+  }
+}
+
+function showRoundResult(winner) {
+  const name = winner === 1 ? CONFIG.player1Name : CONFIG.player2Name;
+  const color = winner === 1 ? '#a855f7' : '#f97316';
+  dom.roundResult.textContent = `${name} scoort!`;
+  dom.roundResult.style.color = color;
+  dom.roundResult.style.animation = 'none';
+  void dom.roundResult.offsetWidth;
+  dom.roundResult.style.animation = 'resultFlash 0.9s ease-out forwards';
+}
+
+/* =============================================================
+   GAME OVER
+   ============================================================= */
+function endGame() {
+  state.gameOver = true;
+  state.roundActive = false;
+
+  const p1Won = state.p2HP <= 0;
+  const winnerName = p1Won ? CONFIG.player1Name : CONFIG.player2Name;
+  const winnerColor = p1Won ? '#a855f7' : '#f97316';
+
+  dom.gameOverTitle.textContent = `${winnerName} wint!`;
+  dom.gameOverTitle.style.color = winnerColor;
+  dom.gameOverSubtitle.textContent = `Score: ${CONFIG.player1Name} ${state.p1Score} — ${state.p2Score} ${CONFIG.player2Name}`;
+
+  // Swap character sprites
+  dom.p1Character.src = p1Won ? CONFIG.player1Win : CONFIG.player1Lose;
+  dom.p2Character.src = p1Won ? CONFIG.player2Lose : CONFIG.player2Win;
+  dom.goP1Img.src = p1Won ? CONFIG.player1Win : CONFIG.player1Lose;
+  dom.goP2Img.src = p1Won ? CONFIG.player2Lose : CONFIG.player2Win;
+
+  if (!p1Won) dom.goP1Img.classList.add('loser');
+  else dom.goP2Img.classList.add('loser');
+
+  dom.gameOver.classList.add('active');
+}
+
+/* =============================================================
+   UI UPDATES
+   ============================================================= */
+function updateHP() {
+  const p1Pct = (state.p1HP / CONFIG.startingHP) * 100;
+  const p2Pct = (state.p2HP / CONFIG.startingHP) * 100;
+  dom.p1HPBar.style.width = p1Pct + '%';
+  dom.p2HPBar.style.width = p2Pct + '%';
+  dom.p1HPText.textContent = state.p1HP + ' HP';
+  dom.p2HPText.textContent = state.p2HP + ' HP';
+
+  // Color change at low HP
+  if (p1Pct <= 30) dom.p1HPBar.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+  else dom.p1HPBar.style.background = '';
+  if (p2Pct <= 30) dom.p2HPBar.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+  else dom.p2HPBar.style.background = '';
+}
+
+function updateScores() {
+  dom.p1Score.textContent = `${state.p1Score} / ${state.totalRounds}`;
+  dom.p2Score.textContent = `${state.p2Score} / ${state.totalRounds}`;
+}
+
+function disableButtons(container) {
+  Array.from(container.children).forEach(btn => btn.disabled = true);
+}
+
+function enableButtons(container) {
+  Array.from(container.children).forEach(btn => {
+    if (!btn.classList.contains('correct') && !btn.classList.contains('wrong')) {
+      btn.disabled = false;
+    }
+  });
+}
+
+function disableAllButtons() {
+  disableButtons(dom.p1Answers);
+  disableButtons(dom.p2Answers);
+}
+
+/* =============================================================
+   UTILITIES
+   ============================================================= */
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* =============================================================
+   BOOT
+   ============================================================= */
+init();
+</script>
+</body>
+</html>
